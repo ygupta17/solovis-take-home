@@ -1,0 +1,242 @@
+:root {
+  --bg: #f7f7fb;
+  --panel: #ffffff;
+  --border: #e0e0e8;
+  --text: #1c1c26;
+  --muted: #6b6b7a;
+  --available: #ffffff;
+  --available-border: #b9b9c8;
+  --selected: #3b82f6;
+  --mine: #22c55e;
+  --held: #f59e0b;
+  --sold: #b0b0bc;
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 120px;
+}
+
+header h1 {
+  margin-bottom: 4px;
+  font-size: 1.6rem;
+}
+
+.event-meta {
+  color: var(--muted);
+  margin-top: 0;
+}
+
+.event-list {
+  list-style: none;
+  padding: 0;
+}
+
+.event-list button {
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+  border: 1px solid var(--available-border);
+}
+
+.swatch.available {
+  background: var(--available);
+}
+.swatch.selected {
+  background: var(--selected);
+  border-color: var(--selected);
+}
+.swatch.mine {
+  background: var(--mine);
+  border-color: var(--mine);
+}
+.swatch.held {
+  background: var(--held);
+  border-color: var(--held);
+}
+.swatch.sold {
+  background: var(--sold);
+  border-color: var(--sold);
+}
+
+.banner {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.banner.error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.section h3 {
+  margin-top: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.row-label {
+  width: 20px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.row-seats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.seat {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--available-border);
+  background: var(--available);
+  font-size: 0.7rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.seat.selected {
+  background: var(--selected);
+  border-color: var(--selected);
+  color: white;
+}
+
+.seat.mine {
+  background: var(--mine);
+  border-color: var(--mine);
+  color: white;
+  cursor: default;
+}
+
+.seat.held {
+  background: #fff7e6;
+  border-color: var(--held);
+  color: #92400e;
+}
+
+.seat.held.waitlisted {
+  background: var(--held);
+  color: white;
+}
+
+.seat.sold {
+  background: var(--sold);
+  border-color: var(--sold);
+  color: #f1f1f4;
+  cursor: not-allowed;
+}
+
+.checkout-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.checkout-bar form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.checkout-bar input {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.checkout-bar button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  background: var(--selected);
+  color: white;
+  cursor: pointer;
+}
+
+.checkout-bar button.secondary {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.checkout-bar button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.confirmation {
+  background: #ecfdf5;
+}

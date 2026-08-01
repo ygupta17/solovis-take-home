@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seats
+      POSTGRES_PASSWORD: seats
+      POSTGRES_DB: seats
+    ports:
+      - "5432:5432"
+    volumes:
+      - seats_db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seats -d seats"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Separate instance (not just a separate database) so `make test` can
+  # TRUNCATE freely without ever touching dev data, and so CI doesn't need
+  # the dev container running at all.
+  db-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seats
+      POSTGRES_PASSWORD: seats
+      POSTGRES_DB: seats_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seats -d seats_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data # test DB is disposable; keep it fast
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seats:seats@db:5432/seats
+      HOLD_TTL_SECONDS: "90"
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  web:
+    build: ./web
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+
+volumes:
+  seats_db_data:
