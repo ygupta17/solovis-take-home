@@ -8,12 +8,17 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto; -- gen_random_uuid()
 
 CREATE TYPE seat_status AS ENUM ('AVAILABLE', 'HELD', 'SOLD');
 CREATE TYPE hold_status AS ENUM ('ACTIVE', 'EXPIRED', 'CONFIRMED', 'CANCELLED');
+-- Purely a rendering hint for the frontend's seat-map geometry (semicircle
+-- around a stage vs. a full ring around a field) — has no bearing on the
+-- concurrency model, which is identical regardless of layout.
+CREATE TYPE venue_layout AS ENUM ('theater', 'stadium');
 
 CREATE TABLE events (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name        text NOT NULL,
     venue       text NOT NULL,
     starts_at   timestamptz NOT NULL,
+    layout      venue_layout NOT NULL DEFAULT 'theater',
     created_at  timestamptz NOT NULL DEFAULT now()
 );
 

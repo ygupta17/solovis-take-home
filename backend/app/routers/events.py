@@ -11,14 +11,16 @@ router = APIRouter(tags=["events"])
 
 @router.get("/events", response_model=list[EventOut])
 async def list_events(pool: asyncpg.Pool = Depends(get_pool)):
-    rows = await pool.fetch("SELECT id, name, venue, starts_at FROM events ORDER BY starts_at")
+    rows = await pool.fetch(
+        "SELECT id, name, venue, starts_at, layout FROM events ORDER BY starts_at"
+    )
     return [EventOut(**row) for row in rows]
 
 
 @router.get("/events/{event_id}", response_model=EventOut)
 async def get_event(event_id: uuid.UUID, pool: asyncpg.Pool = Depends(get_pool)):
     row = await pool.fetchrow(
-        "SELECT id, name, venue, starts_at FROM events WHERE id = $1", event_id
+        "SELECT id, name, venue, starts_at, layout FROM events WHERE id = $1", event_id
     )
     if row is None:
         raise HTTPException(404, "event not found")

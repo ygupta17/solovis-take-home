@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
-import type { Booking, Hold, Seat } from "./types";
+import { computeVenueLayout, SEAT_BOX } from "./stadiumLayout";
+import type { Booking, Hold, Seat, VenueLayoutKind } from "./types";
 import { ApiError } from "./types";
 import { useSeatStream } from "./useSeatStream";
 
@@ -8,15 +9,18 @@ const FALLBACK_POLL_MS = 15000;
 
 interface Props {
   eventId: string;
+  layout: VenueLayoutKind;
 }
 
-export function SeatMap({ eventId }: Props) {
+export function SeatMap({ eventId, layout }: Props) {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [waitlisted, setWaitlisted] = useState<Set<string>>(new Set());
   const [hold, setHold] = useState<Hold | null>(null);
   const [booking, setBooking] = useState<Booking | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [detailSeatId, setDetailSeatId] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [name, setName] = useState("");
@@ -58,16 +62,19 @@ export function SeatMap({ eventId }: Props) {
     }
   }, [hold, secondsRemaining, refreshSeats]);
 
-  const grouped = useMemo(() => {
-    const bySection = new Map<string, Map<string, Seat[]>>();
-    for (const seat of seats) {
-      if (!bySection.has(seat.section)) bySection.set(seat.section, new Map());
-      const byRow = bySection.get(seat.section)!;
-      if (!byRow.has(seat.row_label)) byRow.set(seat.row_label, []);
-      byRow.get(seat.row_label)!.push(seat);
+  const detailSeat = seats.find((s) => s.id === detailSeatId) ?? null;
+
+  useEffect(() => {
+    // If the seat we're showing details for stopped being HELD (freed,
+    // promoted, sold) while the panel was open, there's nothing left to
+    // show — close it rather than leave stale actions on screen.
+    if (detailSeatId && (!detailSeat || detailSeat.status !== "HELD")) {
+      setDetailSeatId(null);
+      setDetailError(null);
     }
-    return bySection;
-  }, [seats]);
+  }, [detailSeatId, detailSeat]);
+
+  const venue = useMemo(() => computeVenueLayout(seats, layout), [seats, layout]);
 
   function toggleSelection(seatId: string) {
     setSelected((prev) => {
@@ -79,6 +86,7 @@ export function SeatMap({ eventId }: Props) {
   }
 
   async function toggleWaitlist(seatId: string) {
+    setDetailError(null);
     try {
       if (waitlisted.has(seatId)) {
         await api.leaveWaitlist(seatId);
@@ -90,10 +98,12 @@ export function SeatMap({ eventId }: Props) {
       } else {
         await api.joinWaitlist(seatId);
         setWaitlisted((prev) => new Set(prev).add(seatId));
-        setMessage("You're on the waitlist — you'll get first claim if it frees up.");
       }
     } catch (e) {
-      setMessage(describeError(e));
+      // Shown inline in the detail panel, not the page-level banner — this
+      // is a direct response to the button the user just clicked, not a
+      // general status update.
+      setDetailError(describeError(e));
     }
   }
 
@@ -102,7 +112,11 @@ export function SeatMap({ eventId }: Props) {
     if (seat.status === "SOLD") return;
     if (hold?.seat_ids.includes(seat.id)) return;
     if (seat.status === "HELD") {
-      toggleWaitlist(seat.id);
+      // Don't act on the click itself — show what's going on and let the
+      // user explicitly opt into the waitlist rather than silently
+      // enrolling them. See DECISIONS.md.
+      setDetailError(null);
+      setDetailSeatId(seat.id);
       return;
     }
     if (hold) return; // resolve the current hold before selecting more
@@ -176,30 +190,81 @@ export function SeatMap({ eventId }: Props) {
         </div>
       )}
 
-      <div className="sections">
-        {[...grouped.entries()].map(([section, rows]) => (
-          <div key={section} className="section">
-            <h3>{section}</h3>
-            {[...rows.entries()].map(([row, rowSeats]) => (
-              <div key={row} className="row">
-                <span className="row-label">{row}</span>
-                <div className="row-seats">
-                  {rowSeats.map((seat) => (
-                    <button
-                      key={seat.id}
-                      className={`seat ${seatClass(seat, hold, selected, waitlisted)}`}
-                      onClick={() => onSeatClick(seat)}
-                      disabled={seat.status === "SOLD"}
-                      title={seatTitle(seat, hold, waitlisted)}
-                    >
-                      {seat.seat_number}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+      {detailSeat && (
+        <div className="banner detail-panel" role="status">
+          <span>
+            <strong>{seatLabel(detailSeat)}</strong> is currently held by someone else.
+            {waitlisted.has(detailSeat.id) && " You're on the waitlist for it."}
+          </span>
+          {detailError && <span className="detail-error">{detailError}</span>}
+          <span className="detail-actions">
+            {waitlisted.has(detailSeat.id) ? (
+              <button onClick={() => toggleWaitlist(detailSeat.id)}>Leave waitlist</button>
+            ) : (
+              <button onClick={() => toggleWaitlist(detailSeat.id)}>Join waitlist</button>
+            )}
+            <button
+              className="secondary"
+              onClick={() => {
+                setDetailSeatId(null);
+                setDetailError(null);
+              }}
+            >
+              Close
+            </button>
+          </span>
+        </div>
+      )}
+
+      <div className="venue-scroll">
+        <div className="venue" style={{ width: venue.width, height: venue.height }}>
+          <div
+            className={`venue-center ${layout}`}
+            style={
+              layout === "stadium"
+                ? {
+                    left: venue.centerX,
+                    top: venue.centerY,
+                    width: venue.centerRadius * 2,
+                    height: venue.centerRadius * 2,
+                  }
+                : { left: venue.centerX, top: venue.centerY }
+            }
+          >
+            {venue.centerLabel}
           </div>
-        ))}
+
+          {venue.sections.map((section) => (
+            <div key={section.name}>
+              <span
+                className="section-label"
+                style={{
+                  left: venue.centerX + section.labelX,
+                  top: venue.centerY + section.labelY,
+                }}
+              >
+                {section.name}
+              </span>
+              {section.seats.map(({ seat, x, y }) => (
+                <button
+                  key={seat.id}
+                  className={`seat ${seatClass(seat, hold, selected, waitlisted)}`}
+                  style={{
+                    left: venue.centerX + x - SEAT_BOX / 2,
+                    top: venue.centerY + y - SEAT_BOX / 2,
+                    width: SEAT_BOX,
+                    height: SEAT_BOX,
+                  }}
+                  onClick={() => onSeatClick(seat)}
+                  disabled={seat.status === "SOLD"}
+                  title={`${seatLabel(seat)} — ${seatTitle(seat, hold, waitlisted)}`}
+                >
+                  {seat.seat_number}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       {!hold && !booking && selected.size > 0 && (
@@ -270,10 +335,14 @@ function seatTitle(seat: Seat, hold: Hold | null, waitlisted: Set<string>): stri
   if (hold?.seat_ids.includes(seat.id)) return "Held by you";
   if (seat.status === "HELD") {
     return waitlisted.has(seat.id)
-      ? "Held by someone else — click to leave waitlist"
-      : "Held by someone else — click to join waitlist";
+      ? "Held by someone else — you're on the waitlist"
+      : "Held by someone else — click for details";
   }
   return "Available";
+}
+
+function seatLabel(seat: Seat): string {
+  return `${seat.section} ${seat.row_label}${seat.seat_number}`;
 }
 
 function describeError(e: unknown): string {
@@ -291,6 +360,8 @@ function describeError(e: unknown): string {
         return "You're already on the waitlist for that seat.";
       case "seat_available":
         return "That seat just became available — select it directly.";
+      case "own_hold":
+        return "You already hold this seat (maybe in another tab) — nothing to wait for.";
       default:
         return "Something went wrong. Please try again.";
     }

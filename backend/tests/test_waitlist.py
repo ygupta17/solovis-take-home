@@ -4,7 +4,10 @@ claim, in a defensible (FIFO arrival) order.
 
 import asyncio
 
+import pytest
+
 from app.db import protocol
+from app.errors import CannotWaitlistOwnHold
 
 
 async def test_waitlist_is_promoted_in_arrival_order_on_cancel(pool, event_id, make_seat):
@@ -73,3 +76,15 @@ async def test_leaving_waitlist_removes_only_that_entry(pool, event_id, make_sea
     seat = await pool.fetchrow("SELECT hold_id FROM seats WHERE id = $1", seat_id)
     owner = await pool.fetchval("SELECT session_token FROM holds WHERE id = $1", seat["hold_id"])
     assert owner == "waiter-2"
+
+
+async def test_cannot_join_waitlist_for_seat_you_already_hold(pool, event_id, make_seat):
+    """Reachable via a second tab of the same browser: same localStorage,
+    hence same session_token, so the seat looks like a plain HELD seat to
+    that tab even though it's the caller's own hold.
+    """
+    seat_id = await make_seat()
+    await protocol.create_hold(pool, event_id, [seat_id], "holder")
+
+    with pytest.raises(CannotWaitlistOwnHold):
+        await protocol.join_waitlist(pool, seat_id, "holder")

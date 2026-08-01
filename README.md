@@ -16,39 +16,28 @@ Docker Compose.
 
 ## Run it
 
-Requires Docker (with Compose). `docker compose up --build` itself is
-identical on macOS, Windows, and Linux — the setup to get Docker running
-differs, see below.
+## MAC User
+Requires Docker (with Compose).
 
-### macOS
-
-**If Docker isn't installed:**
+## If docker is not installed
 ```bash
 brew install --cask docker
 ```
-Then launch it once (`open -a Docker`, or from Applications) so the daemon
-starts. If `docker` isn't found in a fresh terminal afterward, add this to
-`~/.zshrc` and `source ~/.zshrc`:
+
 ```bash
-export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+nano ~/.zshrc
+```
+and add export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+
+```bash
+source ~/.zshrc
 ```
 
-**If Docker is already installed:** just make sure Docker Desktop is running
-(`open -a Docker`), then skip to the command below.
+```bash
+docker compose up --build
+```
 
-### Windows
-
-Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
-— it requires WSL2 (Windows 10 version 2004+ or Windows 11; the installer
-prompts to enable this if it isn't already on). Once Docker Desktop is
-running, `docker compose up --build` works unchanged in PowerShell or cmd.
-
-If you also want the "Run the backend/frontend natively" or the multi-instance
-demo below (both use bash/Makefile syntax), run them from **WSL2** rather than
-PowerShell — since Docker Desktop already needs WSL2 anyway, that gets you a
-real Linux shell where every command in this README works as written.
-
-### Then, on any OS
+## If docker is installed
 
 ```bash
 docker compose up --build

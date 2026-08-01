@@ -42,3 +42,11 @@ class HoldNotActive(Exception):
 
 class AlreadyOnWaitlist(Exception):
     pass
+
+
+class CannotWaitlistOwnHold(Exception):
+    """The requesting session already holds this seat — waiting for it makes
+    no sense. Reachable in practice when the same browser (shared
+    localStorage, hence shared session token) has the seat open in a second
+    tab/window and that tab doesn't know locally that the seat is "mine".
+    """

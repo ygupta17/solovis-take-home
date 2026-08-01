@@ -23,6 +23,7 @@ import asyncpg
 from app.config import settings
 from app.errors import (
     AlreadyOnWaitlist,
+    CannotWaitlistOwnHold,
     HoldForbidden,
     HoldNotActive,
     HoldNotFound,
@@ -388,11 +389,17 @@ async def join_waitlist(pool: asyncpg.Pool, seat_id: uuid.UUID, session_token: s
     but a moment later would've been auto-promoted anyway — not a
     correctness issue, just a UX nicety either way.
     """
-    seat = await pool.fetchrow("SELECT status FROM seats WHERE id = $1", seat_id)
+    seat = await pool.fetchrow("SELECT status, hold_id FROM seats WHERE id = $1", seat_id)
     if seat is None:
         raise SeatNotFound([seat_id])
     if seat["status"] == "AVAILABLE":
         raise SeatUnavailable([])  # reused as "not contested, just hold it"
+    if seat["hold_id"] is not None:
+        holder = await pool.fetchval(
+            "SELECT session_token FROM holds WHERE id = $1", seat["hold_id"]
+        )
+        if holder == session_token:
+            raise CannotWaitlistOwnHold
     try:
         await pool.execute(
             "INSERT INTO waitlist (id, seat_id, session_token) VALUES ($1, $2, $3)",

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr
 
@@ -9,6 +10,7 @@ class EventOut(BaseModel):
     name: str
     venue: str
     starts_at: datetime
+    layout: Literal["theater", "stadium"]
 
 
 class SeatOut(BaseModel):

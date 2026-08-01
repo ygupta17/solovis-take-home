@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.db import protocol
 from app.dependencies import get_pool, session_token
-from app.errors import AlreadyOnWaitlist, SeatNotFound, SeatUnavailable
+from app.errors import AlreadyOnWaitlist, CannotWaitlistOwnHold, SeatNotFound, SeatUnavailable
 
 router = APIRouter(tags=["waitlist"])
 
@@ -27,7 +27,15 @@ async def join_waitlist(
         ) from e
     except AlreadyOnWaitlist as e:
         raise HTTPException(409, detail={"error": "already_on_waitlist"}) from e
-    return Response(status_code=201)
+    except CannotWaitlistOwnHold as e:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "own_hold",
+                "detail": "you already hold this seat (maybe in another tab)",
+            },
+        ) from e
+    return {"seat_id": seat_id, "waitlisted": True}
 
 
 @router.delete("/seats/{seat_id}/waitlist", status_code=204)

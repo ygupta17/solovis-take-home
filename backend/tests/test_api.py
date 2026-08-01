@@ -99,3 +99,42 @@ async def test_cancel_then_rehold(client, event_id, make_seat):
         headers={"X-Session-Token": "session-2"},
     )
     assert resp.status_code == 201
+
+
+async def test_join_and_leave_waitlist_return_valid_json_bodies(client, event_id, make_seat):
+    """Regression test: join_waitlist previously returned a bare 201 with an
+    empty body, which broke the frontend's fetch wrapper (it unconditionally
+    tried to JSON-parse the response). Only caught by testing through the
+    actual HTTP layer — protocol-level tests call the Python function
+    directly and never touch response serialization at all.
+    """
+    seat_id = await make_seat()
+    await client.post(
+        f"/events/{event_id}/holds",
+        json={"seat_ids": [str(seat_id)]},
+        headers={"X-Session-Token": "holder"},
+    )
+
+    join_resp = await client.post(
+        f"/seats/{seat_id}/waitlist", headers={"X-Session-Token": "waiter"}
+    )
+    assert join_resp.status_code == 201
+    assert join_resp.json() == {"seat_id": str(seat_id), "waitlisted": True}
+
+    leave_resp = await client.delete(
+        f"/seats/{seat_id}/waitlist", headers={"X-Session-Token": "waiter"}
+    )
+    assert leave_resp.status_code == 204
+    assert leave_resp.content == b""
+
+
+async def test_join_waitlist_for_own_hold_is_rejected(client, event_id, make_seat):
+    seat_id = await make_seat()
+    headers = {"X-Session-Token": "holder"}
+    await client.post(
+        f"/events/{event_id}/holds", json={"seat_ids": [str(seat_id)]}, headers=headers
+    )
+
+    resp = await client.post(f"/seats/{seat_id}/waitlist", headers=headers)
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error"] == "own_hold"

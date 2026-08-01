@@ -1,10 +1,12 @@
 export type SeatStatus = "AVAILABLE" | "HELD" | "SOLD";
+export type VenueLayoutKind = "theater" | "stadium";
 
 export interface EventSummary {
   id: string;
   name: string;
   venue: string;
   starts_at: string;
+  layout: VenueLayoutKind;
 }
 
 export interface Seat {

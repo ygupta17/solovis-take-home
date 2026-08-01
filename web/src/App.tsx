@@ -24,29 +24,46 @@ export function App() {
     <div className="app">
       <header>
         <h1>Seat Reservation</h1>
-        {selected && (
+        {selected ? (
           <p className="event-meta">
             {selected.name} — {selected.venue} —{" "}
             {new Date(selected.starts_at).toLocaleDateString()}
+            {events.length > 1 && (
+              <>
+                {" · "}
+                <button className="link-button" onClick={() => setSelectedId(null)}>
+                  all events
+                </button>
+              </>
+            )}
           </p>
+        ) : (
+          <p className="event-meta">Pick an event to see its live seat map.</p>
         )}
       </header>
 
       {error && <div className="banner error">{error}</div>}
 
-      {!selected && events.length > 1 && (
-        <ul className="event-list">
+      {!selected && events.length > 0 && (
+        <div className="event-grid">
           {events.map((e) => (
-            <li key={e.id}>
-              <button onClick={() => setSelectedId(e.id)}>
-                {e.name} — {e.venue}
-              </button>
-            </li>
+            <button key={e.id} className="event-card" onClick={() => setSelectedId(e.id)}>
+              <span className={`event-card-layout ${e.layout}`}>{e.layout}</span>
+              <strong>{e.name}</strong>
+              <span className="event-card-venue">{e.venue}</span>
+              <span className="event-card-date">
+                {new Date(e.starts_at).toLocaleDateString(undefined, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            </button>
           ))}
-        </ul>
+        </div>
       )}
 
-      {selected && <SeatMap eventId={selected.id} />}
+      {selected && <SeatMap eventId={selected.id} layout={selected.layout} />}
     </div>
   );
 }

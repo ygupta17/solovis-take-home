@@ -26,7 +26,7 @@ body {
 }
 
 .app {
-  max-width: 960px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 24px 16px 120px;
 }
@@ -41,20 +41,69 @@ header h1 {
   margin-top: 0;
 }
 
-.event-list {
-  list-style: none;
+.link-button {
+  background: none;
+  border: none;
   padding: 0;
+  color: var(--selected);
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
 }
 
-.event-list button {
-  width: 100%;
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.event-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   text-align: left;
-  padding: 12px;
-  margin-bottom: 8px;
+  padding: 16px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
+}
+
+.event-card:hover {
+  border-color: var(--selected);
+}
+
+.event-card strong {
+  font-size: 1rem;
+  margin-top: 4px;
+}
+
+.event-card-venue {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.event-card-date {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.event-card-layout {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.event-card-layout.stadium {
+  background: #ecfdf5;
+  color: #065f46;
 }
 
 .legend {
@@ -115,47 +164,101 @@ header h1 {
   color: #991b1b;
 }
 
-.section {
+.detail-panel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  background: #fff7e6;
+  border-color: var(--held);
+  color: #92400e;
+}
+
+.detail-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.detail-actions button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--selected);
+  color: white;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.detail-actions button.secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.venue-scroll {
+  overflow-x: auto;
+  margin: 0 -16px 16px;
+  padding: 8px 16px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
 }
 
-.section h3 {
-  margin-top: 0;
+.venue {
+  position: relative;
+  margin: 0 auto;
 }
 
-.row {
+.venue-center {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: #2a2a35;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  justify-content: center;
+  padding: 10px 22px;
+  border-radius: 6px;
 }
 
-.row-label {
-  width: 20px;
+.venue-center.stadium {
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #3f6b3f;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.section-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--muted);
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
-.row-seats {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .seat {
-  width: 30px;
-  height: 30px;
+  position: absolute;
   border-radius: 6px;
   border: 1px solid var(--available-border);
   background: var(--available);
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   cursor: pointer;
   color: var(--text);
+  padding: 0;
+  line-height: 1;
 }
 
 .seat.selected {

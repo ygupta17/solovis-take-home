@@ -27,8 +27,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(resp.status, body);
   }
-  if (resp.status === 204) return undefined as T;
-  return (await resp.json()) as T;
+  // Don't key off status code for "has a body" — 201s can be empty too
+  // (POST /seats/{id}/waitlist is exactly that case). Read as text first
+  // and only parse if there's actually something there, so any endpoint
+  // that returns an empty success body doesn't throw on JSON.parse("").
+  const text = await resp.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const api = {
