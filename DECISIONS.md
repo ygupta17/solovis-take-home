@@ -45,6 +45,38 @@ three pieces together.
   thousands of full-list queries.
 - **Validation logic and error handling.** Not allowing invalid characters in the name and making sure email has a valid domain(by ensuring there is a period in the email) at time of confirming a seat
 
+## Alternatives considered and/or rejected
+
+- **For concurrency**, could have gone with a "version number + retry"
+  approach instead of Postgres's row locking — check a version number,
+  and if it changed, try again. Problem is that doesn't really wait in
+  line for anything; under a rush it's just whoever's retry happens to
+  land first, which isn't really "fair," just lucky timing. A separate
+  "advisory lock" was another option, but there's already exactly one row
+  per seat to lock, so that would've just been an extra thing to keep
+  track of for nothing extra in return.
+- **For live updates**, the app could keep its own list of who's connected
+  and push updates to them directly, instead of going through Postgres's
+  `LISTEN`/`NOTIFY`. That falls apart the moment there's more than one
+  server running, since server A has no idea who's connected to server B.
+  Also considered sending the *exact* details of what changed instead of
+  just "something changed, go check" — but those messages can get lost in
+  transit, and then someone's screen would be quietly wrong with no way to
+  notice. "Just go re-check" fixes itself instead of staying wrong.
+- **For handing a freed seat to the next waitlisted person**, there's a
+  common trick called `SKIP LOCKED` — skip past anything busy and grab
+  whatever's next available. That's built for pulling jobs off a shared
+  queue where any of them will do. Here there's only one specific "next
+  person in line" for a given seat, so skipping would mean permanently
+  passing over them, not just making them wait a beat.
+- **Skipped an ORM** (a tool that writes SQL for you) since the whole
+  point of this project is the locking logic itself — burying it behind a
+  tool that does things automatically would hide the one part worth
+  looking at.
+- **Used one plain SQL file for the schema** instead of a proper migration
+  tool like Alembic. This means there's no track record to fall back on if the schema needs to
+  change later.
+
 
 ## What I deliberately left out, and why
 
@@ -59,33 +91,4 @@ spend the remaining time actually standing it up in the cloud. In a production e
 - **CORS is wide open.** (`allow_origins=["*"]` in `app/main.py`). Fine for a
   take-home hitting `localhost`, not something to carry past it — a real
   deploy would lock this down to the actual frontend origin per environment.
-
-## Testing strategy
-
-Every backend test runs against a **real** Postgres instance
-
-- `test_protocol.py` — state-machine coverage: every transition and rejection
-  path (expiry, wrong session, double-confirm, cancel-after-confirm, lazy
-  reclaim without the sweeper, all-or-nothing multi-seat holds).
-- `test_concurrency.py` — the direct evidence for "never sold twice": tens of
-  real concurrent coroutines racing for one seat/hold, asserting exactly one
-  winner *and* independently checking the raw DB row count, plus a
-  mixed-contention scenario across many seats and buyers.
-- `test_waitlist.py` — promotion happens in arrival order, chains correctly
-  through repeated releases, and leaving the waitlist only removes that entry.
-- `test_api.py` — the HTTP contract on top of the above (status codes, error
-  shapes, header handling).
-- `scripts/load_test.py` and `scripts/multi_instance_load_test.py` — the
-  "show, don't assert" artifacts: real HTTP requests against a **running**
-  API (not in-process calls), independently checked against the database
-  afterward. Run against the actual Docker stack for this submission:
-  - 200 concurrent requests, single instance → 1 winner, 199 clean 409s,
-    ~0.38s wall-clock, DB confirms exactly 1 `hold_seats` row.
-  - 500 concurrent requests, single instance → 1 winner, ~3.67s wall-clock
-    (right at the `lock_timeout` boundary, confirming it's load-bearing).
-  - **300 concurrent requests split across two independent API containers
-    sharing one Postgres** (the multi-instance stretch) → 1 winner total, DB
-    confirms exactly 1 row. Reproduce: `docker compose up -d`, then `docker
-    run` a second `api` image on port 8001 pointed at the same `db` (exact
-    command in README), then run the script with `CONCURRENCY=300`.
 

@@ -121,8 +121,7 @@ On Windows (PowerShell): `.venv\Scripts\Activate.ps1` to activate, then
 `$env:TEST_DATABASE_URL = "postgresql://seats:seats@localhost:5433/seats_test"`
 on its own line before `python -m pytest -v`.
 
-All backend tests run against a real Postgres instance — see
-[DECISIONS.md](DECISIONS.md) for why. `tests/test_concurrency.py` is the
+All backend tests run against a real Postgres instance. `tests/test_concurrency.py` is the
 direct evidence for "never sold twice": real concurrent coroutines racing for
 one seat, checked against both the API responses and the raw database.
 
@@ -196,4 +195,4 @@ CLAUDE.md           initial specs for agent, also has information about concurre
 
 ## Time spent
 
-~10 hours.
+~12 hours.
