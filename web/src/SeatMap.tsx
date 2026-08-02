@@ -7,6 +7,11 @@ import { useSeatStream } from "./useSeatStream";
 
 const FALLBACK_POLL_MS = 15000;
 
+// Mirrors NAME_PATTERN in backend/app/schemas.py — this copy is only for
+// fast inline feedback via the input's `pattern` attribute; the backend is
+// the actual source of truth and re-checks this on submit regardless.
+const NAME_PATTERN = /^[A-Za-zÀ-ÖØ-öø-ÿ'.\- ]+$/;
+
 // One tint per section, cycled by section order — ties each section's arc
 // band to its label so it's visually obvious where one section ends and
 // the next begins, instead of relying on the text label alone.
@@ -43,7 +48,36 @@ export function SeatMap({ eventId, layout }: Props) {
 
   const refreshSeats = useCallback(async () => {
     try {
-      setSeats(await api.getSeats(eventId));
+      const fetched = await api.getSeats(eventId);
+      setSeats(fetched);
+
+      // A waitlist promotion creates a hold server-side (triggered by
+      // someone else releasing the seat) — this browser never called
+      // createHold for it, so the only way to find out is noticing a seat
+      // whose hold_id now belongs to us. Only auto-adopt it if we're not
+      // already mid-checkout on something else, so we don't lose track of
+      // an unrelated in-progress hold (a real but rare edge case: getting
+      // promoted on a second seat while already holding a first one).
+      const promoted = fetched.find(
+        (s) => s.hold_id && !holdRef.current?.seat_ids.includes(s.id),
+      );
+      if (promoted && !holdRef.current) {
+        setHold({
+          id: promoted.hold_id!,
+          event_id: eventId,
+          seat_ids: [promoted.id],
+          expires_at: promoted.hold_expires_at!,
+        });
+        setWaitlisted((prev) => {
+          const next = new Set(prev);
+          next.delete(promoted.id);
+          return next;
+        });
+        setMessage(
+          `${seatLabel(promoted)} is yours — you were promoted off the waitlist! ` +
+            "Confirm it before the hold expires.",
+        );
+      }
     } catch {
       setMessage("Couldn't load the seat map. Retrying shortly...");
     }
@@ -178,8 +212,17 @@ export function SeatMap({ eventId, layout }: Props) {
       setHold(null);
     } catch (e) {
       setMessage(describeError(e));
-      setHold(null);
-      refreshSeats();
+      // Only a hold that's actually gone (expired/contested) should clear
+      // the held seats — a validation error (e.g. a bad name/email) means
+      // the hold is still perfectly good, so clearing it here would make
+      // the user re-select and re-hold seats just to fix a typo.
+      const holdIsGone =
+        e instanceof ApiError &&
+        (e.body?.error === "hold_not_active" || e.body?.error === "seat_contested");
+      if (holdIsGone) {
+        setHold(null);
+        refreshSeats();
+      }
     } finally {
       setBusy(false);
     }
@@ -326,6 +369,8 @@ export function SeatMap({ eventId, layout }: Props) {
             <input
               placeholder="Full name"
               required
+              pattern={NAME_PATTERN.source}
+              title="Letters, spaces, hyphens, apostrophes, and periods only"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -402,6 +447,8 @@ function describeError(e: unknown): string {
         return "That seat just became available — select it directly.";
       case "own_hold":
         return "You already hold this seat (maybe in another tab) — nothing to wait for.";
+      case "invalid_input":
+        return e.body.detail ?? "Please check your name and email.";
       default:
         return "Something went wrong. Please try again.";
     }

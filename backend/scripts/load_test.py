@@ -66,6 +66,26 @@ async def verify_single_winner(seat_id: uuid.UUID) -> int:
         await conn.close()
 
 
+async def cleanup_event(event_id: uuid.UUID) -> None:
+    """Removes the throwaway event (and everything it accumulated) this run
+    created — this script is meant to leave no trace in the real event
+    picker, same reasoning as why setup_target_seat uses its own dedicated
+    event instead of reusing a seeded one.
+    """
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        await conn.execute(
+            "DELETE FROM hold_seats WHERE seat_id IN (SELECT id FROM seats WHERE event_id = $1)",
+            event_id,
+        )
+        await conn.execute("DELETE FROM bookings WHERE event_id = $1", event_id)
+        await conn.execute("DELETE FROM seats WHERE event_id = $1", event_id)
+        await conn.execute("DELETE FROM holds WHERE event_id = $1", event_id)
+        await conn.execute("DELETE FROM events WHERE id = $1", event_id)
+    finally:
+        await conn.close()
+
+
 async def attempt(client: httpx.AsyncClient, event_id: uuid.UUID, seat_id: uuid.UUID, i: int):
     t0 = time.monotonic()
     resp = await client.post(
@@ -82,37 +102,40 @@ async def main() -> int:
     event_id, seat_id = await setup_target_seat()
     print(f"target seat: {seat_id} (event {event_id})")
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        start = time.monotonic()
-        results = await asyncio.gather(
-            *(attempt(client, event_id, seat_id, i) for i in range(CONCURRENCY))
-        )
-        elapsed = time.monotonic() - start
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            start = time.monotonic()
+            results = await asyncio.gather(
+                *(attempt(client, event_id, seat_id, i) for i in range(CONCURRENCY))
+            )
+            elapsed = time.monotonic() - start
 
-    statuses = [r[0] for r in results]
-    latencies = [r[1] for r in results]
-    winners = statuses.count(201)
-    conflicts = statuses.count(409)
-    other = len(statuses) - winners - conflicts
+        statuses = [r[0] for r in results]
+        latencies = [r[1] for r in results]
+        winners = statuses.count(201)
+        conflicts = statuses.count(409)
+        other = len(statuses) - winners - conflicts
 
-    print()
-    print(f"total requests   : {len(statuses)}")
-    print(f"201 Created      : {winners}")
-    print(f"409 Conflict     : {conflicts}")
-    print(f"other status     : {other}")
-    print(f"wall clock       : {elapsed:.3f}s ({len(statuses) / elapsed:.0f} req/s)")
-    print(f"p50 / p99 latency: {sorted(latencies)[len(latencies)//2]*1000:.1f}ms / "
-          f"{sorted(latencies)[int(len(latencies)*0.99)]*1000:.1f}ms")
+        print()
+        print(f"total requests   : {len(statuses)}")
+        print(f"201 Created      : {winners}")
+        print(f"409 Conflict     : {conflicts}")
+        print(f"other status     : {other}")
+        print(f"wall clock       : {elapsed:.3f}s ({len(statuses) / elapsed:.0f} req/s)")
+        print(f"p50 / p99 latency: {sorted(latencies)[len(latencies)//2]*1000:.1f}ms / "
+              f"{sorted(latencies)[int(len(latencies)*0.99)]*1000:.1f}ms")
 
-    db_winners = await verify_single_winner(seat_id)
-    print()
-    print(f"independent DB check — hold_seats rows for target seat: {db_winners}")
+        db_winners = await verify_single_winner(seat_id)
+        print()
+        print(f"independent DB check — hold_seats rows for target seat: {db_winners}")
 
-    ok = winners == 1 and db_winners == 1 and other == 0
-    print()
-    print("RESULT:", "PASS — exactly one winner, confirmed at the API and in the DB" if ok
-          else "FAIL — seat was sold more than once, or an unexpected status occurred")
-    return 0 if ok else 1
+        ok = winners == 1 and db_winners == 1 and other == 0
+        print()
+        print("RESULT:", "PASS — exactly one winner, confirmed at the API and in the DB" if ok
+              else "FAIL — seat was sold more than once, or an unexpected status occurred")
+        return 0 if ok else 1
+    finally:
+        await cleanup_event(event_id)
 
 
 if __name__ == "__main__":

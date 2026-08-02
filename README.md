@@ -51,6 +51,33 @@ docker compose up --build
 Stop with `docker compose down` (add `-v` to also wipe the Postgres volume —
 without it, bookings survive a restart, which is the point).
 
+## Windows User
+
+Requires Docker Desktop, which requires WSL2 — Docker Desktop will prompt
+you to enable it during install if it isn't already turned on.
+
+### If Docker Desktop is not installed
+
+Install it via `winget` (PowerShell):
+
+```powershell
+winget install Docker.DockerDesktop
+```
+
+or download the installer directly from Docker's website. Launch Docker
+Desktop once after installing and make sure it's running (check for the
+whale icon in the system tray) before continuing.
+
+### Then, same as macOS/Linux
+
+```powershell
+docker compose up --build
+```
+
+No PATH changes needed here — unlike macOS, `docker compose` works out of
+the box in PowerShell or CMD once Docker Desktop is running. Same URLs,
+same seeded demo event, same `docker compose down` to stop.
+
 ## Run the backend/frontend natively (Postgres still needs to come from somewhere)
 
 Only the API and web processes run natively here — you still need a Postgres
@@ -74,6 +101,13 @@ npm install
 VITE_API_BASE_URL=http://localhost:8000 npm run dev
 ```
 
+On Windows (PowerShell), three lines differ: activate the venv with
+`.venv\Scripts\Activate.ps1` instead of `source .venv/bin/activate`, and set
+each `DATABASE_URL`/`VITE_API_BASE_URL` on its own line first
+(`$env:DATABASE_URL = "postgresql://seats:seats@localhost:5432/seats"`)
+since PowerShell doesn't support the `VAR=value command` inline form — then
+just run the command on the next line as usual.
+
 ## Tests
 
 ```bash
@@ -83,19 +117,16 @@ source .venv/bin/activate      # after the venv setup above
 TEST_DATABASE_URL=postgresql://seats:seats@localhost:5433/seats_test python -m pytest -v
 ```
 
+On Windows (PowerShell): `.venv\Scripts\Activate.ps1` to activate, then
+`$env:TEST_DATABASE_URL = "postgresql://seats:seats@localhost:5433/seats_test"`
+on its own line before `python -m pytest -v`.
+
 All backend tests run against a real Postgres instance — see
 [DECISIONS.md](DECISIONS.md) for why. `tests/test_concurrency.py` is the
 direct evidence for "never sold twice": real concurrent coroutines racing for
 one seat, checked against both the API responses and the raw database.
 
-Or via `make test` / `make lint` (see [Makefile](Makefile)).
-
-Frontend: `cd web && npm run lint && npm run typecheck && npm run build`.
-
-CI (`.github/workflows/ci.yml`) runs all of the above, including the
-concurrency test, against a real Postgres service container on every push.
-
-## "Show, don't assert": load-test evidence
+## load-test evidence
 
 With the stack running (`docker compose up`), from `backend/` with the venv
 active:
@@ -110,10 +141,10 @@ call), then independently re-checks the database. Actual output from this
 submission:
 
 ```
-concurrency: 200 → 201 Created: 1, 409 Conflict: 199, 0.65s wall-clock
+concurrency: 200 → 201 Created: 1, 409 Conflict: 199, ~0.38s wall-clock
   independent DB check — hold_seats rows for target seat: 1 → PASS
 
-concurrency: 500 → 201 Created: 1, 409 Conflict: 499, 3.68s wall-clock
+concurrency: 500 → 201 Created: 1, 409 Conflict: 499, ~3.67s wall-clock
   independent DB check — hold_seats rows for target seat: 1 → PASS
 ```
 
@@ -153,9 +184,14 @@ beyond a "join/leave waitlist" click on someone else's held seat.
 ## Project layout
 
 ```
-backend/    FastAPI service — app/db/protocol.py is the concurrency core
-db/         init.sql schema, loaded automatically by the Postgres container
-web/        React + TypeScript seat-map UI (Vite)
+backend/            FastAPI service — app/db/protocol.py is the concurrency core
+db/                 init.sql schema, loaded automatically by the Postgres container
+web/                React + TypeScript seat-map UI (Vite)
+docker-compose.yml  db + api + web, one-command local stack (see "Run it" above)
+Makefile            shortcuts: make up / down / test / lint / load-test / seed
+README.md           this file — setup, running, and testing instructions
+DECISIONS.md        architecture rationale, trade-offs, what was cut and why
+CLAUDE.md           initial specs for agent, also has information about concurrency protocol
 ```
 
 ## Time spent

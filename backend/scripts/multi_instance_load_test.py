@@ -52,6 +52,24 @@ async def setup_target_seat() -> tuple[uuid.UUID, uuid.UUID]:
         await conn.close()
 
 
+async def cleanup_event(event_id: uuid.UUID) -> None:
+    """Removes the throwaway event this run created — see load_test.py's
+    version of this for why (the event picker shouldn't accumulate one of
+    these per run)."""
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        await conn.execute(
+            "DELETE FROM hold_seats WHERE seat_id IN (SELECT id FROM seats WHERE event_id = $1)",
+            event_id,
+        )
+        await conn.execute("DELETE FROM bookings WHERE event_id = $1", event_id)
+        await conn.execute("DELETE FROM seats WHERE event_id = $1", event_id)
+        await conn.execute("DELETE FROM holds WHERE event_id = $1", event_id)
+        await conn.execute("DELETE FROM events WHERE id = $1", event_id)
+    finally:
+        await conn.close()
+
+
 async def attempt(base_url: str, event_id: uuid.UUID, seat_id: uuid.UUID, i: int):
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
@@ -69,46 +87,49 @@ async def main() -> int:
     event_id, seat_id = await setup_target_seat()
     print(f"target seat: {seat_id} (event {event_id})")
 
-    start = time.monotonic()
-    tasks = []
-    for i in range(CONCURRENCY):
-        base = API_BASE_URL_1 if i % 2 == 0 else API_BASE_URL_2
-        tasks.append(attempt(base, event_id, seat_id, i))
-    results = await asyncio.gather(*tasks)
-    elapsed = time.monotonic() - start
-
-    by_instance: dict[str, list[int]] = {API_BASE_URL_1: [], API_BASE_URL_2: []}
-    for base, status in results:
-        by_instance[base].append(status)
-
-    print()
-    for base, statuses in by_instance.items():
-        print(f"{base}: {len(statuses)} requests, {statuses.count(201)} winners, "
-              f"{statuses.count(409)} conflicts")
-    print(f"wall clock: {elapsed:.3f}s")
-
-    total_winners = sum(s.count(201) for s in by_instance.values())
-
-    conn = await asyncpg.connect(DATABASE_URL)
     try:
-        db_winners = await conn.fetchval(
-            "SELECT count(*) FROM hold_seats WHERE seat_id = $1", seat_id
+        start = time.monotonic()
+        tasks = []
+        for i in range(CONCURRENCY):
+            base = API_BASE_URL_1 if i % 2 == 0 else API_BASE_URL_2
+            tasks.append(attempt(base, event_id, seat_id, i))
+        results = await asyncio.gather(*tasks)
+        elapsed = time.monotonic() - start
+
+        by_instance: dict[str, list[int]] = {API_BASE_URL_1: [], API_BASE_URL_2: []}
+        for base, status in results:
+            by_instance[base].append(status)
+
+        print()
+        for base, statuses in by_instance.items():
+            print(f"{base}: {len(statuses)} requests, {statuses.count(201)} winners, "
+                  f"{statuses.count(409)} conflicts")
+        print(f"wall clock: {elapsed:.3f}s")
+
+        total_winners = sum(s.count(201) for s in by_instance.values())
+
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            db_winners = await conn.fetchval(
+                "SELECT count(*) FROM hold_seats WHERE seat_id = $1", seat_id
+            )
+        finally:
+            await conn.close()
+
+        print(f"\ntotal winners across both instances: {total_winners}")
+        print(f"independent DB check — hold_seats rows for target seat: {db_winners}")
+
+        ok = total_winners == 1 and db_winners == 1
+        print()
+        print(
+            "RESULT:",
+            "PASS — exactly one winner across two independent instances"
+            if ok
+            else "FAIL — seat was sold more than once across instances",
         )
+        return 0 if ok else 1
     finally:
-        await conn.close()
-
-    print(f"\ntotal winners across both instances: {total_winners}")
-    print(f"independent DB check — hold_seats rows for target seat: {db_winners}")
-
-    ok = total_winners == 1 and db_winners == 1
-    print()
-    print(
-        "RESULT:",
-        "PASS — exactly one winner across two independent instances"
-        if ok
-        else "FAIL — seat was sold more than once across instances",
-    )
-    return 0 if ok else 1
+        await cleanup_event(event_id)
 
 
 if __name__ == "__main__":

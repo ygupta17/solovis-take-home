@@ -16,6 +16,11 @@ export interface Seat {
   seat_number: number;
   status: SeatStatus;
   hold_expires_at: string | null;
+  // Only set when the current session's own hold owns this seat — null for
+  // every other HELD seat, including other people's. Lets the client notice
+  // a waitlist promotion (a hold created server-side, not by this browser
+  // calling createHold) from a plain seat-map refetch.
+  hold_id: string | null;
 }
 
 export interface Hold {
