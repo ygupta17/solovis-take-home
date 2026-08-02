@@ -62,9 +62,7 @@ spend the remaining time actually standing it up in the cloud. In a production e
 
 ## Testing strategy
 
-Every backend test runs against a **real** Postgres instance (a disposable
-`db-test` service) — mocking the database would test nothing meaningful for a
-problem whose entire correctness argument is "the database does the locking."
+Every backend test runs against a **real** Postgres instance
 
 - `test_protocol.py` — state-machine coverage: every transition and rejection
   path (expiry, wrong session, double-confirm, cancel-after-confirm, lazy
