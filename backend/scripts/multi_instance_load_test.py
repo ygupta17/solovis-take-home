@@ -26,9 +26,17 @@ CONCURRENCY = int(os.environ.get("CONCURRENCY", "200"))
 
 
 async def setup_target_seat() -> tuple[uuid.UUID, uuid.UUID]:
+    """Uses a dedicated throwaway event, not an existing seeded one, so this
+    script never leaves a stray section behind in a real demo event's seat
+    map (see load_test.py for the same fix and why it matters)."""
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        event_id = await conn.fetchval("SELECT id FROM events ORDER BY created_at LIMIT 1")
+        event_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO events (id, name, venue, starts_at) VALUES ($1, 'Multi-Instance Load "
+            "Test Event', 'N/A', now())",
+            event_id,
+        )
         seat_id = uuid.uuid4()
         await conn.execute(
             """

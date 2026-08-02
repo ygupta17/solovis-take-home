@@ -27,20 +27,19 @@ CONCURRENCY = int(os.environ.get("CONCURRENCY", "200"))
 
 
 async def setup_target_seat() -> tuple[uuid.UUID, uuid.UUID]:
-    """Inserts one fresh seat under the existing demo event (or a throwaway
-    event if none exists yet) so this script is repeatable without
-    colliding with seats other runs/tests have already sold.
+    """Inserts one fresh seat under a dedicated throwaway event so this
+    script is repeatable without colliding with seats other runs/tests have
+    already sold — and, importantly, without polluting a real seeded demo
+    event's seat map with a stray section.
     """
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        event_id = await conn.fetchval("SELECT id FROM events ORDER BY created_at LIMIT 1")
-        if event_id is None:
-            event_id = uuid.uuid4()
-            await conn.execute(
-                "INSERT INTO events (id, name, venue, starts_at) VALUES ($1, 'Load Test Event', "
-                "'N/A', now())",
-                event_id,
-            )
+        event_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO events (id, name, venue, starts_at) VALUES ($1, 'Load Test Event', "
+            "'N/A', now())",
+            event_id,
+        )
         seat_id = uuid.uuid4()
         label = uuid.uuid4().hex[:6]
         await conn.execute(

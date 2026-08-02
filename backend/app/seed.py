@@ -41,12 +41,12 @@ EVENTS: list[dict] = [
         "layout": "stadium",
         "days_out": 60,
         "sections": [
-            ("Floor", 2, 12),
+            ("Floor", 3, 32),
             ("Lower Bowl North", 4, 12),
             ("Lower Bowl East", 4, 8),
             ("Lower Bowl South", 4, 12),
             ("Lower Bowl West", 4, 8),
-            ("Upper Bowl", 5, 14),
+            ("Upper Bowl", 6, 44),
         ],
     },
     {
@@ -85,16 +85,18 @@ async def seed_event(
     )
 
     seats = []
-    for section, n_rows, n_seats in sections:
+    for section_order, (section, n_rows, n_seats) in enumerate(sections):
         for row_idx in range(n_rows):
             row_label = ROW_LABELS[row_idx]
             for seat_number in range(1, n_seats + 1):
-                seats.append((uuid.uuid4(), event_id, section, row_label, seat_number))
+                seats.append(
+                    (uuid.uuid4(), event_id, section, section_order, row_label, seat_number)
+                )
 
     await conn.executemany(
         """
-        INSERT INTO seats (id, event_id, section, row_label, seat_number)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO seats (id, event_id, section, section_order, row_label, seat_number)
+        VALUES ($1, $2, $3, $4, $5, $6)
         """,
         seats,
     )

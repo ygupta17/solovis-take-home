@@ -43,7 +43,7 @@ async def get_seat_map(event_id: uuid.UUID, pool: asyncpg.Pool = Depends(get_poo
         SELECT id, section, row_label, seat_number, status, hold_expires_at
         FROM seats
         WHERE event_id = $1
-        ORDER BY section, row_label, seat_number
+        ORDER BY section_order, section, row_label, seat_number
         """,
         event_id,
     )
