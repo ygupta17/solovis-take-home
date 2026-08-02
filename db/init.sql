@@ -40,6 +40,12 @@ CREATE TABLE seats (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id         uuid NOT NULL REFERENCES events(id),
     section          text NOT NULL,
+    -- Depth order of this seat's section within the venue (0 = closest to
+    -- the stage/field). Purely a rendering concern — Postgres has no way to
+    -- infer that "Orchestra" is nearer the stage than "Balcony" from the
+    -- name alone, so the seeder assigns this explicitly rather than the
+    -- frontend guessing from alphabetical section order.
+    section_order    int NOT NULL DEFAULT 0,
     row_label        text NOT NULL,
     seat_number      int NOT NULL,
     status           seat_status NOT NULL DEFAULT 'AVAILABLE',

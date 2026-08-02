@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
-import { computeVenueLayout, SEAT_BOX } from "./stadiumLayout";
+import { computeVenueLayout, sectionBandPath, SEAT_BOX } from "./stadiumLayout";
 import type { Booking, Hold, Seat, VenueLayoutKind } from "./types";
 import { ApiError } from "./types";
 import { useSeatStream } from "./useSeatStream";
 
 const FALLBACK_POLL_MS = 15000;
+
+// One tint per section, cycled by section order — ties each section's arc
+// band to its label so it's visually obvious where one section ends and
+// the next begins, instead of relying on the text label alone.
+const SECTION_COLORS = [
+  { fill: "#dbeafe", stroke: "#93c5fd", text: "#1e40af" },
+  { fill: "#fce7f3", stroke: "#f9a8d4", text: "#9d174d" },
+  { fill: "#dcfce7", stroke: "#86efac", text: "#166534" },
+  { fill: "#fef3c7", stroke: "#fcd34d", text: "#92400e" },
+  { fill: "#ede9fe", stroke: "#c4b5fd", text: "#5b21b6" },
+  { fill: "#e0f2fe", stroke: "#7dd3fc", text: "#075985" },
+];
 
 interface Props {
   eventId: string;
@@ -218,6 +230,28 @@ export function SeatMap({ eventId, layout }: Props) {
 
       <div className="venue-scroll">
         <div className="venue" style={{ width: venue.width, height: venue.height }}>
+          <svg
+            className="venue-bands"
+            width={venue.width}
+            height={venue.height}
+            aria-hidden="true"
+          >
+            <g transform={`translate(${venue.centerX}, ${venue.centerY})`}>
+              {venue.sections.map((section, i) => {
+                const color = SECTION_COLORS[i % SECTION_COLORS.length];
+                return (
+                  <path
+                    key={section.name}
+                    d={sectionBandPath(section)}
+                    fill={color.fill}
+                    stroke={color.stroke}
+                    strokeWidth={1}
+                  />
+                );
+              })}
+            </g>
+          </svg>
+
           <div
             className={`venue-center ${layout}`}
             style={
@@ -234,13 +268,18 @@ export function SeatMap({ eventId, layout }: Props) {
             {venue.centerLabel}
           </div>
 
-          {venue.sections.map((section) => (
+          {venue.sections.map((section, i) => {
+            const color = SECTION_COLORS[i % SECTION_COLORS.length];
+            return (
             <div key={section.name}>
               <span
                 className="section-label"
                 style={{
                   left: venue.centerX + section.labelX,
                   top: venue.centerY + section.labelY,
+                  background: color.fill,
+                  borderColor: color.stroke,
+                  color: color.text,
                 }}
               >
                 {section.name}
@@ -263,7 +302,8 @@ export function SeatMap({ eventId, layout }: Props) {
                 </button>
               ))}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

@@ -204,10 +204,10 @@ header h1 {
 .venue-scroll {
   overflow-x: auto;
   margin: 0 -16px 16px;
-  padding: 8px 16px;
-  background: var(--panel);
+  padding: 20px 16px;
+  background: radial-gradient(ellipse at 50% 0%, #fbfbfe 0%, var(--panel) 70%);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
 }
 
 .venue {
@@ -215,38 +215,57 @@ header h1 {
   margin: 0 auto;
 }
 
+.venue-bands {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.venue-bands path {
+  stroke-linejoin: round;
+  fill-opacity: 0.55;
+}
+
 .venue-center {
   position: absolute;
   transform: translate(-50%, -100%);
-  background: #2a2a35;
+  background: linear-gradient(180deg, #34343f 0%, #201f28 100%);
   color: white;
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 22px;
-  border-radius: 6px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 
 .venue-center.stadium {
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #3f6b3f;
+  background: radial-gradient(circle at 35% 30%, #4d7c4d 0%, #385c38 60%, #2c482c 100%);
   padding: 0;
   width: 100%;
   height: 100%;
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 255, 255, 0.12),
+    0 4px 14px rgba(0, 0, 0, 0.2);
 }
 
 .section-label {
   position: absolute;
   transform: translate(-50%, -50%);
   font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--muted);
+  font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .seat {
@@ -259,6 +278,17 @@ header h1 {
   color: var(--text);
   padding: 0;
   line-height: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease,
+    background 0.1s ease;
+}
+
+.seat:hover:not(:disabled):not(.mine) {
+  transform: scale(1.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  z-index: 1;
 }
 
 .seat.selected {
@@ -290,6 +320,7 @@ header h1 {
   border-color: var(--sold);
   color: #f1f1f4;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .checkout-bar {
